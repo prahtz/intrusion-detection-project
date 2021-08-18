@@ -1,0 +1,4 @@
+env/*
+res/*
+*.pyc
+*.pyo
