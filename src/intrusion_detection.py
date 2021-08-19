@@ -21,12 +21,12 @@ def remove_noise(binary, noise_threshold):
     binary[labels != 0] == 255
     return binary
 
-def apply_morphological_operations(binary):
+def apply_morphological_operations(binary, closing_k_shape):
     morphed = binary.copy()
-    closing_v = cv2.getStructuringElement(cv2.MORPH_RECT,(23,23))
-    morphed = cv2.morphologyEx(morphed, cv2.MORPH_CLOSE, closing_v)
+    closing_k = cv2.getStructuringElement(cv2.MORPH_RECT, closing_k_shape)
+    morphed = cv2.morphologyEx(morphed, cv2.MORPH_CLOSE, closing_k)
     morphed = morphed.astype(np.uint8)
-    contour,hier = cv2.findContours(morphed,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_SIMPLE)
+    contour, _ = cv2.findContours(morphed,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_SIMPLE)
 
     for cnt in contour:
         cnt = cv2.approxPolyDP(cnt, 3, True)
@@ -37,7 +37,7 @@ def get_connected_components(binary):
     n, labels, stats, _ = cv2.connectedComponentsWithStats(binary.astype(np.int8))
     return n-1, labels, stats[1:]
 
-def classify_objects(frame, labels, n, stats, person_thresh = 3000, obj_thresh = 0.7):
+def classify_objects(frame, labels, n, stats, person_thresh = 3000, obj_thresh = 0.8):
     obj = { i: 'other' for i in range(0, n)}
     #Maybe better to use compactness (P^2/A) or Haralick’s Circularity
     max_area_id = np.argmax(stats[:,-1]) if n > 0 else -1
@@ -48,7 +48,7 @@ def classify_objects(frame, labels, n, stats, person_thresh = 3000, obj_thresh =
             region = np.zeros(labels.shape, dtype=np.uint8)
             region[labels == i+1] = 255
             edge_pts = np.argwhere(cv2.Canny(region, 100, 200))
-            if gradient_magnitudes(region, frame, edge_pts) < obj_thresh:
+            if gradient_directions(region, frame, edge_pts) < obj_thresh:
                 obj[i] = 'false object'
             else:
                 obj[i] = 'true object'
@@ -64,7 +64,7 @@ def colored_blobs(binary, n, labels, colors_pattern = COLORS_PATTERN_DEFAULT):
         blobs[labels == i+1] = colors_pattern[colors[i]]
     return blobs, colors
 
-def start_analysis(capture_id, train_frames = 100, intensity_threshold = 25, intensity_measure = linf_dist, alpha = 0.1, beta = 0.4, update_fp = False, visualize = False):
+def start_analysis(capture_id, train_frames = 100, intensity_threshold = 25, intensity_measure = linf_dist, alpha = 0.1, beta = 0.4, closing_k_shape = (23,23), update_fp = False, visualize = False):
     cap = cv2.VideoCapture(capture_id)
     bkg, _ = blind_background(cap)
     text_results = []
@@ -88,7 +88,7 @@ def start_analysis(capture_id, train_frames = 100, intensity_threshold = 25, int
         binary = remove_noise(binary, noise_threshold)
 
         #Initialize change mask by applying some binary morphological operators to the binary image
-        change_mask = apply_morphological_operations(binary)
+        change_mask = apply_morphological_operations(binary, closing_k_shape)
 
         #Background update
         bkg = update_background(change_mask, bkg, frame, alpha)
