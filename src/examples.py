@@ -18,4 +18,8 @@ def example1():
         if cv2.waitKey(0) & 0xFF == ord('q'):
             break
 
-example1()
+def testZNCC():
+    video_name = 'res/video.avi'
+    start_analysis(video_name, intensity_threshold = 15, alpha = 0.3, beta = 0.4, closing_k_shape = (11,11), update_fp = False, visualize = True)
+
+testZNCC()

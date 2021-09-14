@@ -37,6 +37,22 @@ def get_connected_components(binary):
     n, labels, stats, _ = cv2.connectedComponentsWithStats(binary.astype(np.int8))
     return n-1, labels, stats[1:]
 
+def remove_intensity_changes(n, labels, change_mask, bkg, frame, thresh = 0.95):
+    result = change_mask.copy()
+    contours, _ = cv2.findContours(change_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    for cnt in contours:
+        x,y,w,h = cv2.boundingRect(cnt)
+        bkg_patch = bkg[y:y+h, x:x+w].copy()
+        frame_patch = frame[y:y+h, x:x+w].copy()
+        bkg_patch[change_mask[y:y+h, x:x+w] == 0] = 0
+        frame_patch[change_mask[y:y+h, x:x+w] == 0] = 0
+        zncc = cv2.matchTemplate(bkg_patch, frame_patch, cv2.TM_CCOEFF_NORMED)
+        if zncc > thresh:
+            result[y:y+h, x:x+w] = 0
+        print(zncc)
+    return result
+        
+
 def classify_objects(frame, labels, n, stats, person_thresh = 3000, obj_thresh = 0.8):
     obj = { i: 'other' for i in range(0, n)}
     #Maybe better to use compactness (P^2/A) or Haralick’s Circularity
@@ -89,12 +105,14 @@ def start_analysis(capture_id, train_frames = 100, intensity_threshold = 25, int
 
         #Initialize change mask by applying some binary morphological operators to the binary image
         change_mask = apply_morphological_operations(binary, closing_k_shape)
-
-        #Background update
-        bkg = update_background(change_mask, bkg, frame, alpha)
         
         #Find connected components (blobs) with statistics
         n, labels, stats = get_connected_components(change_mask)
+
+        change_mask = remove_intensity_changes(n, labels, change_mask, bkg, frame)
+
+        #Background update
+        bkg = update_background(change_mask, bkg, frame, alpha)
 
         #Classify objects
         obj = classify_objects(frame, labels, n, stats)
