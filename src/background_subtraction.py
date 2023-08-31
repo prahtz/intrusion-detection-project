@@ -1,8 +1,8 @@
-import numpy as np
-from numpy.typing import NDArray
-from typing import Callable, List, Union, Iterable
+from typing import Callable, Iterable, List, Union
 
 import cv2
+import numpy as np
+from numpy.typing import NDArray
 
 
 class BackgroundSubtraction:
@@ -28,6 +28,9 @@ class BackgroundSubtraction:
         self.area_filter_fn = area_filter_fn
         self.bkg = self.compute_blind_background(background_samples)
 
+        self.open_k = cv2.getStructuringElement(cv2.MORPH_RECT, self.opening_k_shape)
+        self.closing_k = cv2.getStructuringElement(cv2.MORPH_RECT, self.closing_k_shape)
+
     def compute_blind_background(
         self,
         background_samples: List[NDArray],
@@ -42,10 +45,8 @@ class BackgroundSubtraction:
         return binary
 
     def apply_morphological_operations(self, binary: NDArray):
-        open_k = cv2.getStructuringElement(cv2.MORPH_RECT, self.opening_k_shape)
-        closing_k = cv2.getStructuringElement(cv2.MORPH_RECT, self.closing_k_shape)
-        binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, open_k)
-        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, closing_k)
+        binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, self.open_k)
+        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, self.closing_k)
         return binary
 
     def get_bounding_boxes(self, binary: NDArray):
