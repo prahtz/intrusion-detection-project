@@ -2,3 +2,4 @@ matplotlib==3.4.2
 numpy==1.21.1
 opencv-python==4.5.3.56
 prettytable==2.2.0
+Cython==3.0.6

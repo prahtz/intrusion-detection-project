@@ -2,6 +2,7 @@ from typing import Callable, Iterable, List, Union
 
 import cv2
 import numpy as np
+import subtraction_utils
 from numpy.typing import NDArray
 
 
@@ -17,6 +18,7 @@ class BackgroundSubtraction:
         handle_light_changes: bool = True,
         zncc_threshold: float = 0.95,
         area_filter_fn: Callable = None,
+        c_optimized: bool = True,
     ) -> None:
         self.alpha = alpha
         self.beta = beta
@@ -26,6 +28,7 @@ class BackgroundSubtraction:
         self.handle_light_changes = handle_light_changes
         self.zncc_threshold = zncc_threshold
         self.area_filter_fn = area_filter_fn
+        self.c_optimized = c_optimized
         self.bkg = self.compute_blind_background(background_samples)
 
         self.open_k = cv2.getStructuringElement(cv2.MORPH_RECT, self.opening_k_shape)
@@ -39,6 +42,8 @@ class BackgroundSubtraction:
         return np.float32(np.median(bkg, axis=0))
 
     def binarize_frame(self, frame: NDArray):
+        if self.c_optimized:
+            return subtraction_utils.binarize_frame(self.bkg, frame, self.threshold)
         binary = np.abs(self.bkg - frame)
         binary[binary <= self.threshold] = 0
         binary[binary > self.threshold] = 255
@@ -83,22 +88,25 @@ class BackgroundSubtraction:
         return new_binary, new_bboxes
 
     def update_background(self, binary: NDArray, frame: NDArray):
-        f_mask = binary == 255
-        b_mask = binary == 0
-        x = np.zeros(frame.shape)
-        y = np.zeros(self.bkg.shape)
-        x[b_mask] = frame[b_mask]
-        y[b_mask] = self.bkg[b_mask]
-        new_bkg = x * self.alpha + (1 - self.alpha) * y
-        new_bkg[f_mask] = self.bkg[f_mask]
-        self.bkg = np.float32(new_bkg)
+        if self.c_optimized:
+            self.bkg = subtraction_utils.update_background(binary, frame, self.bkg, self.alpha, self.beta)
+        else:
+            f_mask = binary == 255
+            b_mask = binary == 0
+            x = np.zeros(frame.shape)
+            y = np.zeros(self.bkg.shape)
+            x[b_mask] = frame[b_mask]
+            y[b_mask] = self.bkg[b_mask]
+            new_bkg = x * self.alpha + (1 - self.alpha) * y
+            new_bkg[f_mask] = self.bkg[f_mask]
+            self.bkg = np.float32(new_bkg)
 
-        x = np.zeros(self.bkg.shape)
-        y = np.zeros(self.bkg.shape)
-        x[f_mask] = frame[f_mask]
-        y[f_mask] = self.bkg[f_mask]
-        new_bkg = x * self.beta + (1 - self.beta) * y
-        self.bkg[f_mask] = new_bkg[f_mask]
+            x = np.zeros(self.bkg.shape)
+            y = np.zeros(self.bkg.shape)
+            x[f_mask] = frame[f_mask]
+            y[f_mask] = self.bkg[f_mask]
+            new_bkg = x * self.beta + (1 - self.beta) * y
+            self.bkg[f_mask] = new_bkg[f_mask]
 
     def step(self, frame: NDArray):
         binary = self.binarize_frame(frame)

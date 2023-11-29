@@ -16,6 +16,7 @@ This project is an implementation of a motion detection system, able to detect p
 
 ## Installation and execution
 Clone this repoistory and install the depencencies described in the file `requirements.txt`.\
+Please run <code>python setup.py build_ext --inplace</code> while in the <code>src</code> directory before running any script.\
 In file `main.py` you can find some examples on how to use the `start_analysis` function of `intrusion_detection.py` file.\
 If you want to execute the post-analysis visualization example, go to the `intrusion-detection-project` directory and run 
 ```
